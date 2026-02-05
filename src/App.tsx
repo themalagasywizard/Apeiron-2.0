@@ -113,7 +113,8 @@ type Conversation = {
 type Settings = {
   keys: Record<ProviderId, string>;
   systemPrompt: string;
-  theme: "dark" | "light";
+  colorMode: "dark" | "light";
+  theme: "basic" | "matrix" | "shadcn";
   enabledModels: string[];
   customModels?: ModelItem[];
 };
@@ -133,7 +134,8 @@ const defaultSettings: Settings = {
     deepseek: "",
   },
   systemPrompt: "",
-  theme: "dark",
+  colorMode: "dark",
+  theme: "basic",
   enabledModels: MODEL_OPTIONS.map((model) => model.id),
 };
 
@@ -578,6 +580,7 @@ export default function App() {
   );
   const [projects, setProjects] = useLocalStorage<Project[]>(STORAGE_KEYS.projects, []);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [input, setInput] = useState("");
@@ -593,6 +596,47 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const themeOptions = [
+    {
+      id: "basic" as const,
+      name: "Basic (Default)",
+      description: "Crisp neutrals with balanced contrast for long sessions.",
+      preview: "linear-gradient(135deg, #f4f4f5 0%, #e4e4e7 50%, #0f0f0f 100%)",
+    },
+    {
+      id: "matrix" as const,
+      name: "Matrix",
+      description: "High-contrast terminal greens with cinematic glow.",
+      preview: "linear-gradient(135deg, #020b06 0%, #0b3b1d 55%, #b7ff3c 100%)",
+    },
+    {
+      id: "shadcn" as const,
+      name: "Shadcn",
+      description: "Muted slate with refined surfaces and modern depth.",
+      preview: "linear-gradient(135deg, #f8fafc 0%, #dbe2ea 50%, #0f172a 100%)",
+    },
+  ];
+  const isMatrixTheme = settings.theme === "matrix";
+  const matrixRain = useMemo(() => {
+    let seed = 42;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    const glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$+-*/=<>[]{}";
+    return Array.from({ length: 34 }, (_, index) => {
+      const length = 42 + Math.floor(rand() * 36);
+      const chars = Array.from({ length }, () => glyphs[Math.floor(rand() * glyphs.length)]).join("\n");
+      return {
+        id: `column-${index}`,
+        left: `${(index / 34) * 100}%`,
+        duration: `${12 + rand() * 10}s`,
+        delay: `${-rand() * 20}s`,
+        size: `${13 + rand() * 7}px`,
+        chars,
+      };
+    });
+  }, []);
 
   const allModels = useMemo(() => {
     const custom = Array.isArray(settings.customModels) ? settings.customModels : [];
@@ -619,13 +663,29 @@ export default function App() {
   }, [activeConversationId, conversations, setActiveConversationId]);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (settings.theme === "light") {
-      root.classList.remove("dark");
-    } else {
-      root.classList.add("dark");
+    const storedTheme = (settings as { theme?: string }).theme;
+    const storedMode = (settings as { colorMode?: string }).colorMode;
+    const nextColorMode = storedMode ?? (storedTheme === "light" ? "light" : "dark");
+    const nextTheme = storedTheme === "basic" || storedTheme === "matrix" || storedTheme === "shadcn"
+      ? storedTheme
+      : "basic";
+    if (nextColorMode !== settings.colorMode || nextTheme !== settings.theme) {
+      setSettings({ ...settings, colorMode: nextColorMode, theme: nextTheme });
     }
-  }, [settings.theme]);
+  }, [settings, setSettings]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", settings.colorMode === "dark");
+    root.classList.remove("theme-basic", "theme-matrix", "theme-shadcn");
+    root.classList.add(`theme-${settings.theme}`);
+  }, [settings.colorMode, settings.theme]);
+
+  useEffect(() => {
+    if (settings.theme === "matrix" && settings.colorMode !== "dark") {
+      setSettings({ ...settings, colorMode: "dark" });
+    }
+  }, [settings.theme, settings.colorMode, settings, setSettings]);
 
   useEffect(() => {
     if (!Array.isArray(settings.enabledModels) || settings.enabledModels.length === 0) {
@@ -964,11 +1024,24 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full">
-      <aside className="w-72 h-full flex flex-col bg-[var(--bg-sidebar)] border-r border-[var(--border-subtle)] shrink-0 transition-all">
-        <div className="px-6 py-5">
-          <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">Apeiron</h1>
-        </div>
+    <div className="relative flex h-screen w-full overflow-hidden">
+      {showSidebar ? (
+        <aside
+          className={cn(
+            "relative z-10 w-72 h-full flex flex-col border-r border-[var(--border-subtle)] shrink-0 transition-all",
+            isMatrixTheme ? "matrix-surface" : "bg-[var(--bg-sidebar)]"
+          )}
+        >
+          <div className="px-6 py-5 flex items-center justify-between">
+            <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">Apeiron</h1>
+            <button
+              className="text-[var(--text-icon)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={() => setShowSidebar(false)}
+              aria-label="Hide sidebar"
+            >
+              <span className="material-symbols-outlined text-[20px]">dock_to_left</span>
+            </button>
+          </div>
         <div className="px-4 mb-4">
           <div className="relative group">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--text-icon)] group-focus-within:text-[var(--text-primary)] transition-colors">search</span>
@@ -1156,9 +1229,43 @@ export default function App() {
             <span>Settings</span>
           </button>
         </div>
-      </aside>
+        </aside>
+      ) : null}
 
-      <main className="flex-1 flex flex-col relative bg-[var(--bg-main)]">
+      <main
+        className={cn(
+          "relative z-10 flex-1 flex flex-col overflow-hidden",
+          isMatrixTheme ? "matrix-surface" : "bg-[var(--bg-main)]"
+        )}
+      >
+        {!showSidebar ? (
+          <button
+            className="absolute top-4 left-4 z-20 flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors"
+            onClick={() => setShowSidebar(true)}
+            aria-label="Show sidebar"
+          >
+            <span className="material-symbols-outlined text-[18px]">dock_to_left</span>
+            <span>Sidebar</span>
+          </button>
+        ) : null}
+        {isMatrixTheme ? (
+          <div className="matrix-rain" aria-hidden="true">
+            {matrixRain.map((column) => (
+              <span
+                key={column.id}
+                className="matrix-column"
+                style={{
+                  left: column.left,
+                  animationDuration: column.duration,
+                  animationDelay: column.delay,
+                  fontSize: column.size,
+                }}
+              >
+                {column.chars}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="flex-1 overflow-y-auto pt-8 pb-40">
           <div className="max-w-3xl mx-auto px-6 space-y-12">
             {activeConversation?.messages.length ? (
@@ -1607,19 +1714,66 @@ export default function App() {
 
             {settingsTab === "appearance" ? (
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-[var(--text-primary)]">Themes</p>
+                    <p className="text-xs text-[var(--text-secondary)]">Award-winning palettes only.</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {themeOptions.map((option) => {
+                      const selected = settings.theme === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          className={cn(
+                            "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors",
+                            selected
+                              ? "border-[var(--text-primary)] bg-[var(--surface-2)]"
+                              : "border-[var(--border-subtle)] bg-[var(--accent-soft)] hover:bg-[var(--hover-bg)]"
+                          )}
+                          onClick={() => setSettings({ ...settings, theme: option.id })}
+                        >
+                          <span
+                            className="h-10 w-10 rounded-xl border border-white/10"
+                            style={{ background: option.preview }}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm text-[var(--text-primary)]">{option.name}</span>
+                            <span className="block text-xs text-[var(--text-secondary)]">{option.description}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--accent-soft)] px-4 py-3">
                   <div>
-                    <p className="text-sm text-[var(--text-primary)]">Theme</p>
-                    <p className="text-xs text-[var(--text-secondary)]">Toggle between light and dark mode.</p>
+                    <p className="text-sm text-[var(--text-primary)]">Mode</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {isMatrixTheme ? "Matrix is dark-only." : "Light or dark, per theme."}
+                    </p>
                   </div>
-                  <button
-                    className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-slate-200"
-                    onClick={() =>
-                      setSettings({ ...settings, theme: settings.theme === "dark" ? "light" : "dark" })
-                    }
-                  >
-                    {settings.theme === "dark" ? "Switch to Light" : "Switch to Dark"}
-                  </button>
+                  <div className="flex items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-1">
+                    {(["light", "dark"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                          settings.colorMode === mode
+                            ? "bg-[var(--text-primary)] text-[var(--surface-1)]"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                          isMatrixTheme && mode === "light" ? "opacity-40 cursor-not-allowed" : ""
+                        )}
+                        onClick={() => {
+                          if (isMatrixTheme && mode === "light") return;
+                          setSettings({ ...settings, colorMode: mode });
+                        }}
+                      >
+                        {mode === "light" ? "Light" : "Dark"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}
