@@ -1202,9 +1202,9 @@ export default function App() {
                               p({ children, ...props }) {
                                 return <div {...props}>{children}</div>;
                               },
-                              code({ inline, className, children, node, ...props }) {
+                              code({ className, children, node, ...props }) {
                                 const content = String(children).replace(/\n$/, "");
-                                if (inline) {
+                                if (!className) {
                                   return (
                                     <code className={className} {...props}>
                                       {children}
