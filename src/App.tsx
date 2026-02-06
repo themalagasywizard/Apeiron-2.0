@@ -90,6 +90,12 @@ type Attachment = {
   dataUrl: string;
 };
 
+type SourceCitation = {
+  url: string;
+  title?: string;
+  content?: string;
+};
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -100,6 +106,7 @@ type Message = {
   isStreaming?: boolean;
   images?: string[];
   attachments?: Attachment[];
+  sources?: SourceCitation[];
 };
 
 type Conversation = {
@@ -154,6 +161,38 @@ function getModelLabel(modelId: string, models: ModelItem[] = MODEL_OPTIONS) {
   return models.find((model) => model.id === modelId)?.label ?? modelId;
 }
 
+function extractSources(annotations: unknown[]): SourceCitation[] {
+  if (!Array.isArray(annotations)) return [];
+  return annotations.flatMap((annotation) => {
+    if (!annotation || typeof annotation !== "object") return [];
+    const ann = annotation as Record<string, unknown>;
+    const citation = (ann.url_citation ?? ann.urlCitation ?? ann) as Record<string, unknown>;
+    const url = typeof citation.url === "string" ? citation.url : typeof ann.url === "string" ? ann.url : "";
+    if (!url) return [];
+    const title = typeof citation.title === "string" ? citation.title : undefined;
+    const content = typeof citation.content === "string" ? citation.content : undefined;
+    return [{ url, title, content }];
+  });
+}
+
+function mergeSources(existing: SourceCitation[] | undefined, incoming: SourceCitation[]) {
+  const map = new Map<string, SourceCitation>();
+  (existing ?? []).forEach((source) => map.set(source.url, { ...source }));
+  incoming.forEach((source) => {
+    const current = map.get(source.url);
+    if (!current) {
+      map.set(source.url, source);
+      return;
+    }
+    map.set(source.url, {
+      url: source.url,
+      title: current.title ?? source.title,
+      content: current.content ?? source.content,
+    });
+  });
+  return Array.from(map.values());
+}
+
 function buildContext(messages: Message[], modelId: string, providerId: ProviderId) {
   return messages.filter((message) => {
     if (message.role === "user") return true;
@@ -170,8 +209,10 @@ async function streamOpenAICompatible(options: {
   systemPrompt?: string;
   onToken: (token: string) => void;
   onImage?: (url: string) => void;
+  onAnnotations?: (annotations: unknown[]) => void;
   supportsImages?: boolean;
   signal?: AbortSignal;
+  plugins?: Array<{ id: string; max_results?: number; search_prompt?: string; engine?: "exa" | "native" }>;
 }) {
   const payloadMessages = [
     ...(options.systemPrompt
@@ -200,6 +241,9 @@ async function streamOpenAICompatible(options: {
   };
   if (options.supportsImages) {
     body.modalities = ["text", "image"];
+  }
+  if (options.plugins && options.plugins.length) {
+    body.plugins = options.plugins;
   }
 
   const response = await fetch(`${options.baseUrl}/chat/completions`, {
@@ -238,6 +282,13 @@ async function streamOpenAICompatible(options: {
         const json = JSON.parse(data);
         const delta = json.choices?.[0]?.delta?.content;
         if (delta) options.onToken(delta);
+        const annotations =
+          json.choices?.[0]?.delta?.annotations ??
+          json.choices?.[0]?.message?.annotations ??
+          json.choices?.[0]?.message?.content?.[0]?.annotations;
+        if (annotations && options.onAnnotations) {
+          options.onAnnotations(annotations);
+        }
         const images = json.choices?.[0]?.delta?.images ?? json.choices?.[0]?.message?.images;
         if (images && options.onImage) {
           for (const img of images) {
@@ -384,8 +435,10 @@ async function streamProviderResponse(options: {
   systemPrompt?: string;
   onToken: (token: string) => void;
   onImage?: (url: string) => void;
+  onAnnotations?: (annotations: unknown[]) => void;
   supportsImages?: boolean;
   signal?: AbortSignal;
+  plugins?: Array<{ id: string; max_results?: number; search_prompt?: string; engine?: "exa" | "native" }>;
 }) {
   if (!options.apiKey) {
     throw new Error("Missing API key for provider.");
@@ -402,8 +455,10 @@ async function streamProviderResponse(options: {
       systemPrompt: options.systemPrompt,
       onToken: options.onToken,
       onImage: options.onImage,
+      onAnnotations: options.onAnnotations,
       supportsImages: options.supportsImages,
       signal: options.signal,
+      plugins: options.plugins,
     });
   }
 
@@ -581,6 +636,7 @@ export default function App() {
   const [projects, setProjects] = useLocalStorage<Project[]>(STORAGE_KEYS.projects, []);
   const [showSettings, setShowSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [input, setInput] = useState("");
@@ -655,6 +711,9 @@ export default function App() {
   }, [enabledModels, settings.keys]);
 
   const selectedModel = availableModels.find((model) => model.id === selectedModelId) ?? availableModels[0] ?? null;
+  const canUseWebSearch = compareMode
+    ? selectedCompareModels.some((modelId) => availableModels.find((m) => m.id === modelId)?.providerId === "openrouter")
+    : selectedModel?.providerId === "openrouter";
 
   useEffect(() => {
     if (!activeConversationId && conversations.length) {
@@ -702,6 +761,12 @@ export default function App() {
   useEffect(() => {
     setSelectedCompareModels((prev) => prev.filter((modelId) => availableModels.some((m) => m.id === modelId)));
   }, [availableModels]);
+
+  useEffect(() => {
+    if (webSearchEnabled && !canUseWebSearch) {
+      setWebSearchEnabled(false);
+    }
+  }, [webSearchEnabled, canUseWebSearch]);
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -920,6 +985,8 @@ export default function App() {
     const tasks = modelsToRun.map(async (modelId) => {
       const model = availableModels.find((m) => m.id === modelId) ?? selectedModel;
       if (!model) return;
+      const useWebSearch = webSearchEnabled && model.providerId === "openrouter";
+      const requestModel = model.id.startsWith("openrouter/") ? model.id.replace("openrouter/", "") : model.id;
       const controller = new AbortController();
       const assistantMessage: Message = {
         id: uid(),
@@ -945,7 +1012,7 @@ export default function App() {
         await streamProviderResponse({
           providerId: model.providerId,
           apiKey: settings.keys[model.providerId],
-          model: model.id.startsWith("openrouter/") ? model.id.replace("openrouter/", "") : model.id,
+          model: requestModel,
           messages: contextMessages,
           systemPrompt: settings.systemPrompt,
           onToken: (token) => {
@@ -978,8 +1045,26 @@ export default function App() {
               updatedAt: Date.now(),
             }));
           },
+          onAnnotations: (annotations) => {
+            const incoming = extractSources(annotations);
+            if (incoming.length === 0) return;
+            updateConversation(activeConversation.id, (conversation) => ({
+              ...conversation,
+              messages: conversation.messages.map((message) =>
+                message.id === assistantMessage.id
+                  ? {
+                      ...message,
+                      sources: mergeSources(message.sources, incoming),
+                      isStreaming: true,
+                    }
+                  : message
+              ),
+              updatedAt: Date.now(),
+            }));
+          },
           supportsImages: model.supportsImages,
           signal: controller.signal,
+          plugins: useWebSearch ? [{ id: "web" }] : undefined,
         });
       } catch (error) {
         abortControllersRef.current.delete(assistantMessage.id);
@@ -1362,6 +1447,37 @@ export default function App() {
                           >
                             {message.content || ""}
                           </ReactMarkdown>
+                          {message.sources && message.sources.length > 0 ? (
+                            <div className="mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-4 py-3">
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                                Sources
+                              </div>
+                              <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                {message.sources.map((source) => {
+                                  let host = "";
+                                  try {
+                                    host = new URL(source.url).hostname.replace(/^www\./, "");
+                                  } catch {
+                                    host = source.url;
+                                  }
+                                  return (
+                                    <a
+                                      key={source.url}
+                                      href={source.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] px-3 py-2 text-left transition-colors hover:bg-[var(--hover-bg)]"
+                                    >
+                                      <div className="text-[11px] text-[var(--text-secondary)]">{host}</div>
+                                      <div className="text-sm text-[var(--text-primary)] break-words">
+                                        {source.title || source.url}
+                                      </div>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
                           {message.images && message.images.length > 0 ? (
                             <div className="flex flex-wrap gap-3 mt-4">
                               {message.images.map((url, index) => (
@@ -1504,6 +1620,25 @@ export default function App() {
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    className={cn(
+                      "size-8 flex items-center justify-center rounded-full border transition-colors",
+                      webSearchEnabled
+                        ? "bg-white text-black border-white"
+                        : "bg-[var(--accent-soft)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:bg-[var(--hover-bg)]",
+                      !canUseWebSearch && "opacity-40 cursor-not-allowed"
+                    )}
+                    onClick={() => {
+                      if (!canUseWebSearch) return;
+                      setWebSearchEnabled((prev) => !prev);
+                    }}
+                    title={canUseWebSearch ? "Web search" : "Web search is available for OpenRouter models"}
+                    aria-pressed={webSearchEnabled}
+                    aria-label="Toggle web search"
+                  >
+                    <span className="material-symbols-outlined text-[18px] leading-none">language</span>
+                  </button>
                   <button
                     type="button"
                     className={cn(
