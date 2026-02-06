@@ -723,8 +723,8 @@ export default function App() {
 
   useEffect(() => {
     const storedTheme = (settings as { theme?: string }).theme;
-    const storedMode = (settings as { colorMode?: string }).colorMode;
-    const nextColorMode = storedMode ?? (storedTheme === "light" ? "light" : "dark");
+    const storedMode = (settings as { colorMode?: "dark" | "light" }).colorMode;
+    const nextColorMode: "dark" | "light" = storedMode ?? (storedTheme === "light" ? "light" : "dark");
     const nextTheme = storedTheme === "basic" || storedTheme === "matrix" || storedTheme === "shadcn"
       ? storedTheme
       : "basic";
