@@ -53,6 +53,12 @@ const PROVIDERS = {
     type: "openai" as const,
     baseUrl: "https://api.mistral.ai/v1",
   },
+  minimax: {
+    id: "minimax",
+    name: "Minimax",
+    type: "openai" as const,
+    baseUrl: "https://api.minimax.io/v1",
+  },
   deepseek: {
     id: "deepseek",
     name: "DeepSeek",
@@ -82,6 +88,7 @@ const MODEL_OPTIONS: ModelItem[] = [
   { id: "openrouter/google/gemini-3-pro-image-preview", label: "Gemini 3 Pro Image", providerId: "openrouter", supportsImages: true },
   { id: "openrouter/google/nano-banana-pro", label: "Nano Banana Pro", providerId: "openrouter", supportsImages: true },
   { id: "openrouter/openai/gpt-5-image", label: "GPT-5 Image", providerId: "openrouter", supportsImages: true },
+  { id: "minimax/MiniMax-M2.5", label: "MiniMax M2.5", providerId: "minimax" },
 ];
 
 type Attachment = {
@@ -138,6 +145,7 @@ const defaultSettings: Settings = {
     anthropic: "",
     google: "",
     mistral: "",
+    minimax: "",
     deepseek: "",
   },
   systemPrompt: "",
@@ -547,6 +555,7 @@ function ModelPicker({
       anthropic: [],
       google: [],
       mistral: [],
+      minimax: [],
       deepseek: [],
     });
   }, [models]);
@@ -720,6 +729,20 @@ export default function App() {
       setActiveConversationId(conversations[0].id);
     }
   }, [activeConversationId, conversations, setActiveConversationId]);
+
+  useEffect(() => {
+    const hasMissingProviderKeys = (Object.keys(defaultSettings.keys) as ProviderId[]).some(
+      (providerId) => typeof settings.keys?.[providerId] !== "string"
+    );
+    if (!hasMissingProviderKeys) return;
+    setSettings({
+      ...settings,
+      keys: {
+        ...defaultSettings.keys,
+        ...settings.keys,
+      },
+    });
+  }, [settings, setSettings]);
 
   useEffect(() => {
     const storedTheme = (settings as { theme?: string }).theme;
@@ -1726,7 +1749,7 @@ export default function App() {
                         type="password"
                         className="flex-1 bg-[var(--accent-soft)] border border-[var(--border-subtle)] rounded-xl px-3 py-2 text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--border-subtle)]"
                         placeholder={`${provider.name} API key`}
-                        value={settings.keys[providerId as ProviderId]}
+                        value={settings.keys[providerId as ProviderId] ?? ""}
                         onChange={(event) =>
                           setSettings({
                             ...settings,
