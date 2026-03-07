@@ -169,6 +169,11 @@ function getModelLabel(modelId: string, models: ModelItem[] = MODEL_OPTIONS) {
   return models.find((model) => model.id === modelId)?.label ?? modelId;
 }
 
+function getRequestModelId(model: ModelItem) {
+  const prefix = `${model.providerId}/`;
+  return model.id.startsWith(prefix) ? model.id.slice(prefix.length) : model.id;
+}
+
 function extractSources(annotations: unknown[]): SourceCitation[] {
   if (!Array.isArray(annotations)) return [];
   return annotations.flatMap((annotation) => {
@@ -1009,7 +1014,7 @@ export default function App() {
       const model = availableModels.find((m) => m.id === modelId) ?? selectedModel;
       if (!model) return;
       const useWebSearch = webSearchEnabled && model.providerId === "openrouter";
-      const requestModel = model.id.startsWith("openrouter/") ? model.id.replace("openrouter/", "") : model.id;
+      const requestModel = getRequestModelId(model);
       const controller = new AbortController();
       const assistantMessage: Message = {
         id: uid(),
