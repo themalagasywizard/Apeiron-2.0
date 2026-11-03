@@ -27,6 +27,8 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+      - name: Build Xcode project
+        run: xcodebuild -project Apeiron.xcodeproj -scheme Apeiron -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode build
       - name: Bundle Apeiron.app
         run: scripts/build-app.sh
       - uses: actions/upload-artifact@v4

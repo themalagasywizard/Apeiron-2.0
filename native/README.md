@@ -28,8 +28,11 @@ ANTHROPIC_API_KEY=… swift run apeiron "explain this repo"
 scripts/build-app.sh                 # release build/Apeiron.app (+ zip)
 ```
 
-Opening `native/Package.swift` in Xcode also works: pick the `Apeiron` scheme
-and run.
+**In Xcode:** open `Apeiron.xcodeproj` and press ⌘R. The app target compiles
+`Sources/ApeironApp` and links `ApeironKit` from the local Swift package, so
+the harness and app live in one place. It signs to run locally, so no
+developer team is needed; set your own team under Signing & Capabilities to
+distribute it. (Opening `Package.swift` directly works too.)
 
 Add API keys in **Settings → Models** (stored in the Keychain) or via the usual
 environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,

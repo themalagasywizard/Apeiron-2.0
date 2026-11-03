@@ -1,23 +1,22 @@
 import SwiftUI
 
-/// Apeiron's mark: three interlaced orbits around a point – "the boundless".
-struct OrbitShape: Shape {
-    var orbits: Int = 3
+/// Apeiron's mark: two open orbits around a point, "the boundless".
+/// An arc of a circle, in degrees measured clockwise from 3 o'clock.
+struct OrbitArc: Shape {
+    var radius: CGFloat
+    var start: Double
+    var end: Double
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radiusX = min(rect.width, rect.height) / 2
-        let radiusY = radiusX * 0.38
-        for index in 0..<orbits {
-            let angle = Double(index) * .pi / Double(orbits)
-            let transform = CGAffineTransform(translationX: center.x, y: center.y)
-                .rotated(by: CGFloat(angle))
-            path.addEllipse(
-                in: CGRect(x: -radiusX, y: -radiusY, width: radiusX * 2, height: radiusY * 2),
-                transform: transform
-            )
-        }
+        let r = min(rect.width, rect.height) / 2 * radius
+        path.addArc(
+            center: CGPoint(x: rect.midX, y: rect.midY),
+            radius: r,
+            startAngle: .degrees(start),
+            endAngle: .degrees(end),
+            clockwise: false
+        )
         return path
     }
 }
@@ -34,13 +33,19 @@ struct ApeironMark: View {
             let time = timeline.date.timeIntervalSinceReferenceDate
             let spin = isActive && !reduceMotion ? Angle.degrees(time.truncatingRemainder(dividingBy: 6) * 60) : .zero
             let pulse = isActive && !reduceMotion ? 1 + 0.06 * sin(time * 3) : 1
+            let line = max(1.2, size / 11)
             ZStack {
-                OrbitShape()
-                    .stroke(theme.accentColor, style: StrokeStyle(lineWidth: max(1.2, size / 16), lineCap: .round))
+                OrbitArc(radius: 1, start: -60, end: 230)
+                    .stroke(theme.accentColor, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .padding(line / 2)
                     .rotationEffect(spin)
+                OrbitArc(radius: 0.66, start: 120, end: 410)
+                    .stroke(theme.accentColor.opacity(0.45), style: StrokeStyle(lineWidth: line * 0.85, lineCap: .round))
+                    .padding(line / 2)
+                    .rotationEffect(.degrees(-spin.degrees * 1.5))
                 Circle()
                     .fill(theme.accentColor)
-                    .frame(width: size * 0.16, height: size * 0.16)
+                    .frame(width: size * 0.26, height: size * 0.26)
                     .scaleEffect(pulse)
             }
             .frame(width: size, height: size)
