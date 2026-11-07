@@ -89,6 +89,7 @@ private struct GeneralSettings: View {
 
 private struct ProviderSettings: View {
     @Environment(AppModel.self) private var app
+    @State private var showBrowser = false
 
     private var providers: [ProviderKind] {
         ProviderKind.allCases.filter { $0 != .demo }
@@ -107,9 +108,28 @@ private struct ProviderSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                LabeledContent {
+                    Button("Browse models…") { showBrowser = true }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("OpenRouter catalog")
+                        Text("DeepSeek, GLM, Qwen, Kimi, Claude, GPT, Gemini and hundreds more with one OpenRouter key.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("More models")
+            }
             CustomModelSection()
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showBrowser) {
+            OpenRouterBrowser()
+                .environment(app)
+                .environment(\.theme, app.settings.theme)
+        }
     }
 }
 

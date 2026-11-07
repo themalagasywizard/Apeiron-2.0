@@ -177,6 +177,9 @@ struct CommandPaletteView: View {
             list.append(Entry(id: "export", icon: "square.and.arrow.up", title: "Export as Markdown…", group: "Actions") { controller.exportMarkdown() })
             list.append(Entry(id: "init", icon: "text.badge.star", title: "Write APEIRON.md for this project", group: "Actions") { controller.send("/init") })
         }
+        list.append(Entry(id: "openrouter", icon: "square.grid.2x2", title: "Browse OpenRouter models…", detail: "DeepSeek, GLM, Qwen, Claude…", group: "Actions") {
+            app.showOpenRouterBrowser = true
+        })
         list.append(Entry(id: "settings", icon: "gearshape", title: "Settings…", group: "Actions", shortcut: "⌘,") { openSettings() })
 
         if let controller {

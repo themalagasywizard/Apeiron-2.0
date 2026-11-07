@@ -43,6 +43,12 @@ struct RootView: View {
             }
         }
         .animation(Motion.snappy, value: app.showCommandPalette)
+        .sheet(isPresented: $app.showOpenRouterBrowser) {
+            OpenRouterBrowser()
+                .environment(app)
+                .environment(\.theme, theme)
+                .tint(theme.accentColor)
+        }
         .environment(\.theme, theme)
         .tint(theme.accentColor)
         .frame(minWidth: 820, minHeight: 560)

@@ -291,6 +291,14 @@ struct ModelPickerList: View {
                                 .buttonStyle(.plain)
                                 .font(theme.ui(11, weight: .medium))
                                 .foregroundStyle(theme.accentColor)
+                        } else if provider == .openRouter {
+                            Button("Browse all…") {
+                                app.showModelPicker = false
+                                app.showOpenRouterBrowser = true
+                            }
+                            .buttonStyle(.plain)
+                            .font(theme.ui(11, weight: .medium))
+                            .foregroundStyle(theme.accentColor)
                         }
                     }
                     .padding(.horizontal, 10)

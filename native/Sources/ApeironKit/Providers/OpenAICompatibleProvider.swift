@@ -62,6 +62,9 @@ public struct OpenAICompatibleProvider: LLMProvider {
             "stream": true,
             "messages": .array(wireMessages(system: request.system, messages: request.messages)),
         ]
+        if kind == .openRouter && request.model.apiModel.hasPrefix("anthropic/") {
+            body["messages"] = .array(addCacheBreakpoints(wireMessages(system: request.system, messages: request.messages)))
+        }
         if kind != .ollama && kind != .mistral {
             body["stream_options"] = ["include_usage": true]
         }
@@ -86,6 +89,37 @@ public struct OpenAICompatibleProvider: LLMProvider {
             body["reasoning"] = ["enabled": true]
         }
         return .object(body)
+    }
+
+    /// Claude via OpenRouter only caches with explicit breakpoints: mark the
+    /// system prompt and the newest user or tool turn, so each request reuses
+    /// everything before it.
+    static func addCacheBreakpoints(_ messages: [JSONValue]) -> [JSONValue] {
+        var messages = messages
+        func mark(_ index: Int) {
+            guard case .object(var message) = messages[index] else { return }
+            let breakpoint: JSONValue = ["type": "ephemeral"]
+            switch message["content"] {
+            case .string(let text)?:
+                message["content"] = .array([["type": "text", "text": .string(text), "cache_control": breakpoint]])
+            case .array(var parts)? where !parts.isEmpty:
+                if case .object(var last) = parts[parts.count - 1] {
+                    last["cache_control"] = breakpoint
+                    parts[parts.count - 1] = .object(last)
+                }
+                message["content"] = .array(parts)
+            default:
+                return
+            }
+            messages[index] = .object(message)
+        }
+        if let system = messages.firstIndex(where: { $0["role"]?.stringValue == "system" }) {
+            mark(system)
+        }
+        if let last = messages.lastIndex(where: { ["user", "tool"].contains($0["role"]?.stringValue ?? "") }) {
+            mark(last)
+        }
+        return messages
     }
 
     static func wireMessages(system: String, messages: [ChatMessage]) -> [JSONValue] {

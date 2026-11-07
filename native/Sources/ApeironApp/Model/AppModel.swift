@@ -23,6 +23,10 @@ final class AppModel {
     var showCommandPalette = false
     var showModelPicker = false
     var showInspector = true
+    var showOpenRouterBrowser = false
+    var openRouterEntries: [OpenRouterCatalog.Entry] = []
+    var openRouterLoading = false
+    var openRouterError: String?
     var keyPresence: [ProviderKind: Bool] = [:]
 
     @ObservationIgnored let store = SessionStore()
@@ -214,6 +218,35 @@ final class AppModel {
         }
         let baseURL = settings.baseURLOverrides[model.provider.rawValue].flatMap { URL(string: $0) }
         return ProviderFactory.make(for: model, apiKey: key, baseURL: baseURL)
+    }
+
+    // MARK: OpenRouter
+
+    /// Fetches OpenRouter's model list once per launch (or on demand).
+    func loadOpenRouterCatalog(force: Bool = false) async {
+        guard force || openRouterEntries.isEmpty, !openRouterLoading else { return }
+        openRouterLoading = true
+        openRouterError = nil
+        defer { openRouterLoading = false }
+        do {
+            let baseURL = settings.baseURLOverrides[ProviderKind.openRouter.rawValue].flatMap { URL(string: $0) }
+            openRouterEntries = try await OpenRouterCatalog.fetch(apiKey: apiKey(for: .openRouter), baseURL: baseURL)
+        } catch {
+            openRouterError = error.localizedDescription
+        }
+    }
+
+    func isInModelList(_ model: ModelDescriptor) -> Bool {
+        allModels.contains { $0.id == model.id }
+    }
+
+    /// Adds an OpenRouter model to the picker, or removes one you added.
+    func toggleModelInList(_ model: ModelDescriptor) {
+        if settings.customModels.contains(where: { $0.id == model.id }) {
+            settings.customModels.removeAll { $0.id == model.id }
+        } else if !ModelCatalog.builtIn.contains(where: { $0.id == model.id }) {
+            settings.customModels.append(model)
+        }
     }
 
     func addAllowRule(_ rule: PermissionRule) {
