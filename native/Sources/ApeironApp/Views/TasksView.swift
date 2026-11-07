@@ -31,6 +31,7 @@ struct TasksView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .overlay(alignment: .top) { TopBarScrim() }
         .confirmationDialog(
             "Delete “\(pendingDelete?.name ?? "")”?",
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),

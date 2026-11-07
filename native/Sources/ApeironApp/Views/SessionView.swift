@@ -20,6 +20,7 @@ struct SessionView: View {
                 bottomStack
             }
         }
+        .overlay(alignment: .top) { TopBarScrim() }
         .background(
             Button("") { if controller.pendingApprovals.isEmpty { controller.stop() } }
                 .keyboardShortcut(.escape, modifiers: [])

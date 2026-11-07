@@ -15,7 +15,6 @@ struct RootView: View {
             } detail: {
                 detail
                     .background(Palette.canvas.ignoresSafeArea())
-                    .overlay(alignment: .top) { TopBarScrim() }
                     .toolbar {
                         ToolbarItem(placement: .navigation) { Breadcrumb() }
                         ToolbarItem(placement: .primaryAction) { TopBarTools() }
@@ -94,7 +93,7 @@ struct RootView: View {
 
 /// Fades content out under the transparent toolbar so it reads as one
 /// continuous surface with the canvas instead of a grey strip.
-private struct TopBarScrim: View {
+struct TopBarScrim: View {
     var body: some View {
         LinearGradient(
             stops: [

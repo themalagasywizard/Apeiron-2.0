@@ -186,7 +186,7 @@ public struct CronSchedule: Sendable, Equatable, Hashable, Codable, CustomString
             case "1-5", "mon-fri": return "Every weekday at \(at)"
             case "0,6", "6,0", "sat,sun", "sun,sat": return "Weekends at \(at)"
             default:
-                if let set = try? CronSchedule.parse(dow, name: "weekday", range: 0...7, names: weekdayNames) {
+                if let set = try? CronSchedule.parse(dow, name: "weekday", range: 0...7, names: Self.weekdayNames) {
                     let names = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"]
                     let days = Set(set.map { $0 % 7 }).sorted().map { names[$0] }
                     let joined = days.count > 1
