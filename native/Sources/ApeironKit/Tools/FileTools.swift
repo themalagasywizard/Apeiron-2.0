@@ -211,7 +211,12 @@ public struct ListDirectoryTool: AgentTool {
 
     public func run(_ input: JSONValue, context: ToolContext) async throws -> ToolOutput {
         let url = context.resolve(input["path"]?.stringValue ?? ".")
-        let entries = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey])
+        let entries: [URL]
+        do {
+            entries = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey])
+        } catch {
+            throw FileAccessError(url: url, underlying: error)
+        }
         var lines: [String] = []
         var skipped = 0
         for entry in entries.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {

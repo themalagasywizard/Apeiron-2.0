@@ -204,6 +204,11 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Apeiron;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Apeiron reads and edits files in the project folders you open.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -233,6 +238,11 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Apeiron;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Apeiron reads and edits files in the project folders you open.";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Apeiron reads and edits files in the project folders you open.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

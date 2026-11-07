@@ -2,11 +2,23 @@ import Foundation
 
 enum WorkspaceWalker {
     /// Enumerates regular files under `root`, skipping heavy folders.
-    static func files(under root: URL, limit: Int = 50_000) -> [URL] {
+    ///
+    /// Throws a readable `FileAccessError` when the root itself can't be
+    /// read (macOS privacy protection, App Sandbox), instead of quietly
+    /// returning nothing, which reads to the model as "the folder is empty".
+    static func files(under root: URL, limit: Int = 50_000) throws -> [URL] {
+        // Enumerators don't descend into a symlinked root, so resolve it.
+        let root = root.resolvingSymlinksInPath()
+        do {
+            _ = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        } catch {
+            throw FileAccessError(url: root, underlying: error)
+        }
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
-            options: [.skipsPackageDescendants]
+            options: [.skipsPackageDescendants],
+            errorHandler: { _, _ in true }
         ) else { return [] }
         var result: [URL] = []
         for case let url as URL in enumerator {
@@ -20,6 +32,17 @@ enum WorkspaceWalker {
             if result.count >= limit { break }
         }
         return result
+    }
+
+    /// The prefix to strip from walked paths, using the same resolved root.
+    static func relativePrefix(for root: URL) -> String {
+        let path = root.resolvingSymlinksInPath().standardizedFileURL.path
+        return path.hasSuffix("/") ? path : path + "/"
+    }
+
+    static func relativePath(of url: URL, root: URL) -> String {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return path.replacingOccurrences(of: relativePrefix(for: root), with: "", options: .anchored)
     }
 }
 
@@ -47,10 +70,9 @@ public struct GlobTool: AgentTool {
     public func run(_ input: JSONValue, context: ToolContext) async throws -> ToolOutput {
         let root = context.resolve(input["path"]?.stringValue ?? ".")
         let pattern = GlobPattern(input["pattern"]?.stringValue ?? "**/*")
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
         var matches: [(String, Date)] = []
-        for url in WorkspaceWalker.files(under: root) {
-            let relative = url.standardizedFileURL.path.replacingOccurrences(of: rootPath, with: "", options: .anchored)
+        for url in try WorkspaceWalker.files(under: root) {
+            let relative = WorkspaceWalker.relativePath(of: url, root: root)
             if pattern.matches(relative) {
                 let date = FileStateTracker.modificationDate(url) ?? .distantPast
                 matches.append((relative, date))
@@ -133,13 +155,12 @@ public struct GrepTool: AgentTool {
             return .error("Invalid regular expression: \(error.localizedDescription)")
         }
         let globPattern = glob.map { GlobPattern($0.contains("/") ? $0 : "**/" + $0) }
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
         var isDirectory: ObjCBool = false
         _ = FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory)
-        let files = isDirectory.boolValue ? WorkspaceWalker.files(under: root) : [root]
+        let files = isDirectory.boolValue ? try WorkspaceWalker.files(under: root) : [root]
         var output: [String] = []
         for url in files {
-            let relative = url.standardizedFileURL.path.replacingOccurrences(of: rootPath, with: "", options: .anchored)
+            let relative = isDirectory.boolValue ? WorkspaceWalker.relativePath(of: url, root: root) : url.lastPathComponent
             if let globPattern, !globPattern.matches(relative) { continue }
             guard let data = try? Data(contentsOf: url), data.count < 2_000_000, !TextUtils.isProbablyBinary(data) else { continue }
             let text = String(decoding: data, as: UTF8.self)

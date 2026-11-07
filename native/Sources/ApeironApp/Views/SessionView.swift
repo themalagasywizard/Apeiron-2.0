@@ -109,6 +109,19 @@ struct ErrorBanner: View {
             if message.contains("API key") {
                 Button("Open Settings") { openSettings() }
                     .buttonStyle(AccentButtonStyle(compact: true))
+            } else if message.contains("macOS blocked access") {
+                if !FileAccess.isSandboxed {
+                    Button("Open Privacy Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(AccentButtonStyle(compact: true))
+                }
+                Button("Check again") {
+                    if let url = controller.workspaceURL { controller.checkWorkspaceAccess(url) }
+                }
+                .buttonStyle(OutlineButtonStyle(compact: true))
             } else {
                 Button("Retry") { controller.retryLast() }
                     .buttonStyle(OutlineButtonStyle(compact: true))

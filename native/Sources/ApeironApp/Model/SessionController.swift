@@ -188,6 +188,7 @@ final class SessionController: Identifiable {
         agent = nil
         project = nil
         app?.noteWorkspace(url)
+        checkWorkspaceAccess(url)
         Task { self.project = await ProjectContext.load(workspace: url, includeGit: false) }
     }
 
@@ -215,6 +216,7 @@ final class SessionController: Identifiable {
         guard let app else { throw CancellationError() }
         let workspace = workspaceURL ?? app.defaultWorkspace()
         if session.workspacePath == nil { session.workspacePath = workspace.path }
+        checkWorkspaceAccess(workspace)
         let project = await ProjectContext.load(workspace: workspace)
         self.project = project
         let model = self.model
@@ -256,6 +258,16 @@ final class SessionController: Identifiable {
     }
 
     /// Rebuilds the agent on the next message (after settings change).
+    /// Touches the folder right away so macOS asks for permission now (not
+    /// mid-task), and explains what to do if access is blocked.
+    func checkWorkspaceAccess(_ url: URL) {
+        if let advice = FileAccess.checkReadable(url) {
+            errorBanner = advice
+        } else if errorBanner?.contains("macOS blocked access") == true {
+            errorBanner = nil
+        }
+    }
+
     func invalidateAgent() {
         guard !isRunning else { return }
         agent = nil

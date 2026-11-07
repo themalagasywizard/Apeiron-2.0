@@ -36,6 +36,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSDesktopFolderUsageDescription</key><string>Apeiron reads and edits files in the project folders you open.</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>Apeiron reads and edits files in the project folders you open.</string>
+  <key>NSDownloadsFolderUsageDescription</key><string>Apeiron reads and edits files in the project folders you open.</string>
+  <key>NSNetworkVolumesUsageDescription</key><string>Apeiron reads and edits files in the project folders you open.</string>
+  <key>NSRemovableVolumesUsageDescription</key><string>Apeiron reads and edits files in the project folders you open.</string>
 </dict>
 </plist>
 PLIST
