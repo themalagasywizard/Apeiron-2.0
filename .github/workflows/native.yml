@@ -1,0 +1,57 @@
+name: Native app
+
+on:
+  push:
+    paths: ["native/**", ".github/workflows/native.yml"]
+  pull_request:
+    paths: ["native/**", ".github/workflows/native.yml"]
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS (app + harness)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+      - name: Swift version
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Build Xcode project
+        run: xcodebuild -project Apeiron.xcodeproj -scheme Apeiron -configuration Debug -destination 'platform=macOS' -derivedDataPath build/xcode build
+      - name: Bundle Apeiron.app
+        run: scripts/build-app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Apeiron-macOS
+          path: native/build/Apeiron.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux (harness + CLI)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: CLI smoke test
+        run: |
+          export APEIRON_HOME="$RUNNER_TEMP/apeiron"
+          mkdir -p "$RUNNER_TEMP/ws" && cd "$RUNNER_TEMP/ws"
+          "$GITHUB_WORKSPACE/native/.build/debug/apeiron" --demo --mode full-access -p "tour this folder"
