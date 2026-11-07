@@ -400,6 +400,54 @@ struct WorkspaceChip: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
+        if let project = controller.project {
+            projectMenu(project)
+        } else {
+            folderMenu
+        }
+    }
+
+    private func projectMenu(_ project: Project) -> some View {
+        Menu {
+            Section("Linked to \(project.name)") {
+                if project.items.isEmpty {
+                    Text("No folders or files yet")
+                }
+                ForEach(project.items) { item in
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                    } label: {
+                        Label(item.name, systemImage: item.isDirectory ? "folder" : "doc")
+                    }
+                }
+            }
+            Divider()
+            Button("Edit project…") { app.beginEditing(project) }
+        } label: {
+            HStack(spacing: 5) {
+                ProjectGlyph(project: project, size: 14)
+                Text(project.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Palette.textSecondary)
+                    .lineLimit(1)
+                if project.items.count > 0 {
+                    Text("\(project.items.count)")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(Palette.textTertiary)
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Palette.hover))
+            .contentShape(Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Chats in \(project.name) have full access to its linked folders and files")
+    }
+
+    private var folderMenu: some View {
         Menu {
             if controller.session.messages.isEmpty {
                 Button("Choose folder…") {

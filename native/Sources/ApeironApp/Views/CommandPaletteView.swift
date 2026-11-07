@@ -166,6 +166,9 @@ struct CommandPaletteView: View {
 
         list.append(Entry(id: "new", icon: "square.and.pencil", title: "New chat", group: "Actions", shortcut: "⌘N") { app.newSession() })
         list.append(Entry(id: "open", icon: "folder", title: "Open folder…", group: "Actions", shortcut: "⌘O") { app.openFolderInNewChat() })
+        list.append(Entry(id: "new-project", icon: "plus.rectangle.on.folder", title: "New project…", group: "Actions", shortcut: "⇧⌘N") { app.beginNewProject() })
+        list.append(Entry(id: "tasks", icon: "clock.arrow.circlepath", title: "Show tasks", detail: "Scheduled, automated prompts", group: "Actions", shortcut: "⇧⌘T") { app.showTasks() })
+        list.append(Entry(id: "new-task", icon: "calendar.badge.plus", title: "New scheduled task…", group: "Actions") { app.beginNewTask() })
         list.append(Entry(id: "inspector", icon: "sidebar.right", title: app.showInspector ? "Hide inspector" : "Show inspector", group: "Actions", shortcut: "⌥⌘I") {
             app.showInspector.toggle()
         })
@@ -208,9 +211,23 @@ struct CommandPaletteView: View {
             }
         }
 
-        for summary in app.summaries.prefix(30) {
-            list.append(Entry(id: "chat-\(summary.id)", icon: "bubble.left", title: summary.title, detail: summary.workspacePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "", group: "Chats") {
-                app.selection = summary.id
+        for project in app.projects {
+            list.append(Entry(id: "project-\(project.id)", icon: "folder", title: project.name, detail: "New chat in project", group: "Projects") {
+                app.newSession(project: project)
+            })
+        }
+
+        for task in app.tasks {
+            list.append(Entry(id: "task-\(task.id)", icon: "play.circle", title: "Run “\(task.name)” now", detail: task.cron?.summary ?? "", group: "Tasks") {
+                if let id = app.runTask(task.id) { app.open(id) }
+            })
+        }
+
+        for summary in app.allSummaries.prefix(30) {
+            let place = summary.projectID.flatMap { app.project(id: $0)?.name }
+                ?? summary.workspacePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+            list.append(Entry(id: "chat-\(summary.id)", icon: "bubble.left", title: summary.title, detail: place, group: "Chats") {
+                app.open(summary.id)
             })
         }
         return list

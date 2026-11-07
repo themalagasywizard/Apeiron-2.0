@@ -13,6 +13,10 @@ public struct Session: Codable, Sendable, Identifiable, Equatable {
     public var usage: Usage
     public var todos: [TodoItem]
     public var isPinned: Bool
+    /// The project this chat belongs to, if any.
+    public var projectID: UUID?
+    /// Set when the chat was started by a scheduled task.
+    public var scheduledTaskID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -25,7 +29,9 @@ public struct Session: Codable, Sendable, Identifiable, Equatable {
         messages: [ChatMessage] = [],
         usage: Usage = .zero,
         todos: [TodoItem] = [],
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        projectID: UUID? = nil,
+        scheduledTaskID: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -38,10 +44,21 @@ public struct Session: Codable, Sendable, Identifiable, Equatable {
         self.usage = usage
         self.todos = todos
         self.isPinned = isPinned
+        self.projectID = projectID
+        self.scheduledTaskID = scheduledTaskID
     }
 
     public var summary: SessionSummary {
-        SessionSummary(id: id, title: title, workspacePath: workspacePath, modelID: modelID, updatedAt: updatedAt, isPinned: isPinned)
+        SessionSummary(
+            id: id,
+            title: title,
+            workspacePath: workspacePath,
+            modelID: modelID,
+            updatedAt: updatedAt,
+            isPinned: isPinned,
+            projectID: projectID,
+            scheduledTaskID: scheduledTaskID
+        )
     }
 
     /// A title from the first prompt.
@@ -68,6 +85,8 @@ public struct SessionSummary: Codable, Sendable, Identifiable, Hashable {
     public var modelID: String
     public var updatedAt: Date
     public var isPinned: Bool
+    public var projectID: UUID?
+    public var scheduledTaskID: UUID?
 }
 
 /// Sessions as JSON files with a small index for fast listing.

@@ -26,6 +26,19 @@ struct EmptyStateView: View {
                     .font(theme.display(34))
                     .foregroundStyle(Palette.textPrimary)
                     .multilineTextAlignment(.center)
+                if let project = controller.project {
+                    HStack(spacing: 7) {
+                        ProjectGlyph(project: project, size: 18)
+                        Text("New chat in \(project.name)")
+                            .font(theme.ui(13, weight: .medium))
+                            .foregroundStyle(Palette.textSecondary)
+                        if !project.items.isEmpty {
+                            Text("· \(project.items.count) linked item\(project.items.count == 1 ? "" : "s"), full access")
+                                .font(theme.ui(12.5))
+                                .foregroundStyle(Palette.textTertiary)
+                        }
+                    }
+                }
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 8)
