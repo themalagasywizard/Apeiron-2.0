@@ -33,6 +33,17 @@ struct ApeironApp: App {
                     .keyboardShortcut("n")
                 Button("Open Folder…") { app.openFolderInNewChat() }
                     .keyboardShortcut("o")
+                Divider()
+                Button("New Project…") { app.beginNewProject() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("New Scheduled Task…") { app.beginNewTask() }
+            }
+            CommandGroup(before: .sidebar) {
+                Button("Chats") { app.route = .chat }
+                    .keyboardShortcut("1", modifiers: [.command])
+                Button("Tasks") { app.showTasks() }
+                    .keyboardShortcut("t", modifiers: [.command, .shift])
+                Divider()
             }
             CommandGroup(after: .sidebar) {
                 Button(app.showInspector ? "Hide Inspector" : "Show Inspector") {

@@ -45,10 +45,16 @@ final class SessionController: Identifiable {
     var attachments: [ComposerAttachment] = []
     /// Bumped whenever the transcript grows, so the view can follow along.
     var scrollTick = 0
+    /// Unattended runs (scheduled tasks) deny approvals instead of waiting.
+    var autoDenyApprovals = false
+    /// True when the last run was stopped by the user.
+    private(set) var wasStopped = false
+    /// Called on the main actor when a run ends.
+    @ObservationIgnored var onRunFinished: ((SessionController) -> Void)?
 
     @ObservationIgnored weak var app: AppModel?
     @ObservationIgnored private var agent: Agent?
-    @ObservationIgnored private var project: ProjectContext?
+    @ObservationIgnored private var projectContext: ProjectContext?
     @ObservationIgnored private var runTask: Task<Void, Never>?
     @ObservationIgnored private let prompter = UIPermissionPrompter()
     @ObservationIgnored private var currentText: AssistantTextModel?
@@ -75,13 +81,29 @@ final class SessionController: Identifiable {
         workspaceURL?.lastPathComponent ?? "No folder"
     }
 
+    var project: Project? {
+        session.projectID.flatMap { app?.project(id: $0) }
+    }
+
+    /// The last thing the assistant said, for run summaries.
+    var lastAssistantText: String? {
+        for message in session.messages.reversed() where message.role == .assistant {
+            let text = message.blocks.compactMap { block -> String? in
+                if case .text(let text) = block { return text }
+                return nil
+            }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { return text }
+        }
+        return nil
+    }
+
     var model: ModelDescriptor {
         app?.model(id: session.modelID) ?? ModelCatalog.builtIn[0]
     }
 
     var isEmpty: Bool { items.isEmpty && !isRunning }
 
-    var customCommands: [CustomCommand] { project?.commands ?? [] }
+    var customCommands: [CustomCommand] { projectContext?.commands ?? [] }
 
     // MARK: Sending
 
@@ -124,11 +146,13 @@ final class SessionController: Identifiable {
     private func start(userEcho: UserItem?, _ makeStream: @escaping (Agent) -> AsyncStream<AgentEvent>) {
         guard !isRunning else { return }
         errorBanner = nil
+        wasStopped = false
         isRunning = true
         statusText = "Thinking"
         if let userEcho {
             append(.user(userEcho))
         }
+        app?.noteStarted(session)
         runTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -144,6 +168,7 @@ final class SessionController: Identifiable {
     }
 
     func stop() {
+        if isRunning { wasStopped = true }
         for approval in pendingApprovals {
             approval.continuation.resume(returning: .deny(feedback: "The user stopped the agent."))
         }
@@ -186,15 +211,46 @@ final class SessionController: Identifiable {
         guard session.messages.isEmpty else { return }
         session.workspacePath = url.path
         agent = nil
-        project = nil
+        projectContext = nil
         app?.noteWorkspace(url)
         checkWorkspaceAccess(url)
-        Task { self.project = await ProjectContext.load(workspace: url, includeGit: false) }
+        Task { self.projectContext = await ProjectContext.load(workspace: url, includeGit: false) }
+    }
+
+    /// Points the chat at a new working folder, even after it has history
+    /// (used when a project's folders change). Takes effect next message.
+    func moveWorkspace(to url: URL) {
+        guard session.workspacePath.map({ URL(fileURLWithPath: $0).standardizedFileURL.path }) != url.standardizedFileURL.path else { return }
+        session.workspacePath = url.path
+        projectContext = nil
+        if !isRunning { agent = nil }
+        checkWorkspaceAccess(url)
+        persist()
+    }
+
+    /// Moves an untouched chat into a project (or out of one).
+    func assign(to project: Project?) {
+        guard session.messages.isEmpty, !isRunning else { return }
+        session.projectID = project?.id
+        if let project {
+            session.mode = project.defaultMode
+            if let modelID = project.defaultModelID, app?.model(id: modelID) != nil { session.modelID = modelID }
+            if let folder = app?.workspace(for: project) {
+                setWorkspace(folder)
+                return
+            }
+        }
+        agent = nil
+        projectContext = nil
     }
 
     // MARK: Approvals
 
     func enqueueApproval(_ request: PermissionRequest, continuation: CheckedContinuation<PermissionReply, Never>) {
+        if autoDenyApprovals {
+            continuation.resume(returning: .deny(feedback: "This is an unattended scheduled run, so actions that need approval are skipped. Carry on without it and mention it in your report."))
+            return
+        }
         pendingApprovals.append(PendingApproval(request: request, continuation: continuation))
         toolCards[request.toolCall.id]?.status = .awaitingApproval
         NSApp.requestUserAttention(.informationalRequest)
@@ -218,16 +274,26 @@ final class SessionController: Identifiable {
         if session.workspacePath == nil { session.workspacePath = workspace.path }
         checkWorkspaceAccess(workspace)
         let project = await ProjectContext.load(workspace: workspace)
-        self.project = project
+        self.projectContext = project
         let model = self.model
         let provider = try app.makeProvider(for: model)
         let tools = ToolRegistry.standard()
-        let systemPrompt = SystemPromptBuilder.build(project: project, model: model, tools: tools, userName: app.userFirstName)
+        let linkedProject = self.project
+        let taskName = session.scheduledTaskID.flatMap { app.task(id: $0)?.name }
+        let systemPrompt = SystemPromptBuilder.build(
+            project: project,
+            model: model,
+            tools: tools,
+            userName: app.userFirstName,
+            projectBrief: linkedProject.map { ProjectBrief($0) },
+            unattendedTask: taskName
+        )
         let context = ToolContext(
             workspace: workspace,
             sessionDirectory: app.store.workingDirectory(for: session.id),
             todos: TodoStore(items: session.todos),
-            skills: project.skills
+            skills: project.skills,
+            linkedRoots: linkedProject?.linkedRoots(excluding: workspace) ?? []
         )
         var rules = app.settings.rules
         rules.allow += project.settings.permissions.allow
@@ -289,6 +355,7 @@ final class SessionController: Identifiable {
         }
         session.todos = todos
         persist()
+        onRunFinished?(self)
     }
 
     private func persist() {

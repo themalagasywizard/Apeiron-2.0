@@ -20,6 +20,7 @@ struct SessionView: View {
                 bottomStack
             }
         }
+        .overlay(alignment: .top) { TopBarScrim() }
         .background(
             Button("") { if controller.pendingApprovals.isEmpty { controller.stop() } }
                 .keyboardShortcut(.escape, modifiers: [])
@@ -211,6 +212,11 @@ struct TranscriptHeader: View {
                 .foregroundStyle(Palette.textPrimary)
                 .lineLimit(2)
             HStack(spacing: 6) {
+                if let project = controller.project {
+                    ProjectGlyph(project: project, size: 14)
+                    Text(project.name)
+                    Text("·")
+                }
                 Image(systemName: "folder")
                 Text(controller.workspaceName)
                 Text("·")

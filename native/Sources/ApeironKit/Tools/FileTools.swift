@@ -233,6 +233,10 @@ public struct ListDirectoryTool: AgentTool {
         if lines.count > 500 { lines = Array(lines.prefix(500)) + ["… \(lines.count - 500) more"] }
         var output = "\(context.displayPath(url))/\n" + lines.map { "  " + $0 }.joined(separator: "\n")
         if skipped > 0 { output += "\n  (\(skipped) ignored: build/vendor/VCS folders)" }
+        if entries.isEmpty {
+            output += "\n  (empty)"
+            if let hint = FileAccess.emptyListingHint(for: url) { output += "\n" + hint }
+        }
         return ToolOutput(output)
     }
 }

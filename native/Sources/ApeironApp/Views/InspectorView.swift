@@ -10,7 +10,7 @@ struct InspectorView: View {
     @State private var selectedFile: String?
 
     enum Tab: String, CaseIterable, Identifiable {
-        case tasks = "Tasks"
+        case tasks = "To-dos"
         case context = "Context"
         case changes = "Changes"
         var id: String { rawValue }
@@ -41,7 +41,7 @@ struct InspectorView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Palette.sidebar)
+        .background(Palette.sidebar.ignoresSafeArea())
         .onChange(of: controller.todos.count) { old, new in
             if old == 0 && new > 0 { tab = .tasks }
         }
@@ -51,7 +51,7 @@ struct InspectorView: View {
         switch tab {
         case .tasks:
             let open = controller.todos.filter { $0.status != .completed }.count
-            return open > 0 ? "Tasks \(open)" : "Tasks"
+            return open > 0 ? "To-dos \(open)" : "To-dos"
         case .changes:
             return controller.changedFiles.isEmpty ? "Changes" : "Changes \(controller.changedFiles.count)"
         case .context:
@@ -64,7 +64,7 @@ struct InspectorView: View {
     @ViewBuilder
     private var tasks: some View {
         if controller.todos.isEmpty {
-            placeholder(icon: "checklist", title: "No tasks yet", detail: "For multi-step work, Apeiron keeps a live task list here.")
+            placeholder(icon: "checklist", title: "No to-dos yet", detail: "For multi-step work, Apeiron keeps a live to-do list here.")
         } else {
             let done = controller.todos.filter { $0.status == .completed }.count
             VStack(alignment: .leading, spacing: 14) {

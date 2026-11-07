@@ -655,7 +655,8 @@ public actor Agent {
             sessionDirectory: childDirectory,
             files: context.files,
             todos: TodoStore(),
-            skills: context.skills
+            skills: context.skills,
+            linkedRoots: context.linkedRoots
         )
         let childTools = readOnly ? ToolRegistry.readOnly() : ToolRegistry.standard(includeSubagents: false)
         let model = subagentModel ?? configuration.model

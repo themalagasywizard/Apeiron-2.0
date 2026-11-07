@@ -10,7 +10,9 @@ public enum SystemPromptBuilder {
         model: ModelDescriptor,
         tools: ToolRegistry,
         date: Date = Date(),
-        userName: String? = nil
+        userName: String? = nil,
+        projectBrief: ProjectBrief? = nil,
+        unattendedTask: String? = nil
     ) -> String {
         var sections: [String] = []
 
@@ -67,6 +69,19 @@ public enum SystemPromptBuilder {
             environment += "\n- Not a git repository"
         }
         sections.append(environment)
+
+        if let projectBrief {
+            sections.append(projectBrief.promptSection)
+        }
+
+        if let unattendedTask {
+            sections.append("""
+            # Scheduled run
+            This chat was started automatically by the scheduled task “\(unattendedTask)”. Nobody is watching \
+            live, so work autonomously, don't ask questions, and finish with a short report of what you did, \
+            what you found and anything that needs the user's attention.
+            """)
+        }
 
         if !project.memory.isEmpty {
             var memory = "# Project memory\nInstructions the user keeps for this project. Follow them; they override the defaults above.\n"

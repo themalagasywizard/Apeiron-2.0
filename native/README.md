@@ -56,8 +56,20 @@ works before adding a key.
 - **Inspector** (⌥⌘I): the live task list, a context gauge with cache hit rate
   and estimated cost, and every file changed this session with its diff.
 - **Command palette** (⌘K): actions, models, modes and chats, fuzzy-matched.
-- **Projects** in the sidebar: recent folders, pinned and recent chats,
-  search, rename, export to Markdown.
+- **Projects.** Name a project and link any folders and files to it (drag
+  and drop works). Every chat in the project gets full read and write access
+  to all of them, plus the project's standing instructions. Projects sit in
+  the sidebar with their chats underneath; start as many chats in a project as
+  you like and they run side by side (the top bar shows how many are working
+  and jumps to any of them).
+- **Tasks** (⇧⌘T): prompts that run on a schedule, cron style. Pick a
+  preset (every few minutes, hourly, daily, weekdays, weekly, monthly) or
+  write a cron expression, choose the project or folder, model and permission
+  mode, and whether approvals are skipped or wait for you. Each run opens a
+  fresh chat, the run history links to it, and a notification reports the
+  result. Tasks run while the app is open; missed runs aren't replayed.
+- **Sidebar**: projects, pinned and recent chats, search, rename, move a
+  chat into a project, export to Markdown.
 - **Composer**: slash commands with completion, file and image attachments
   (drag and drop works), model picker grouped by provider, mode chip.
 

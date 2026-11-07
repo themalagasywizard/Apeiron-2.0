@@ -152,6 +152,9 @@ public final class ToolContext: @unchecked Sendable {
     public let files: FileStateTracker
     public let todos: TodoStore
     public let skills: [Skill]
+    /// Extra folders and files linked to the session's project. The agent has
+    /// the same access to them as to the workspace itself.
+    public let linkedRoots: [URL]
     /// Runs a child agent for the `task` tool; set by the harness.
     public var subagentRunner: (@Sendable (_ description: String, _ prompt: String, _ readOnly: Bool) async throws -> (String, Int))?
 
@@ -160,9 +163,11 @@ public final class ToolContext: @unchecked Sendable {
         sessionDirectory: URL,
         files: FileStateTracker = FileStateTracker(),
         todos: TodoStore = TodoStore(),
-        skills: [Skill] = []
+        skills: [Skill] = [],
+        linkedRoots: [URL] = []
     ) {
         self.workspace = workspace.standardizedFileURL
+        self.linkedRoots = linkedRoots.map(\.standardizedFileURL)
         self.sessionDirectory = sessionDirectory
         self.files = files
         self.todos = todos
@@ -178,10 +183,16 @@ public final class ToolContext: @unchecked Sendable {
         return workspace.appendingPathComponent(expanded).standardizedFileURL
     }
 
+    /// True inside the workspace or any folder or file linked to the project.
     public func isInsideWorkspace(_ url: URL) -> Bool {
-        let root = workspace.path.hasSuffix("/") ? workspace.path : workspace.path + "/"
         let path = url.standardizedFileURL.path
-        return path == workspace.path || path.hasPrefix(root)
+        return ([workspace] + linkedRoots).contains { Self.path(path, isInside: $0) }
+    }
+
+    static func path(_ path: String, isInside root: URL) -> Bool {
+        let rootPath = root.standardizedFileURL.path
+        if path == rootPath { return true }
+        return path.hasPrefix(rootPath.hasSuffix("/") ? rootPath : rootPath + "/")
     }
 
     /// Reads that never need approval: the workspace, this session's own
