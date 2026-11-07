@@ -386,7 +386,8 @@ final class AppModel {
         updated.name = updated.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if updated.name.isEmpty { updated.name = "Untitled project" }
         updated.updatedAt = Date()
-        let isNew = !projects.contains { $0.id == updated.id }
+        let previous = projects.first { $0.id == updated.id }
+        let isNew = previous == nil
         if let index = projects.firstIndex(where: { $0.id == updated.id }) {
             projects[index] = updated
         } else {
@@ -395,8 +396,21 @@ final class AppModel {
         persistProjects()
         expandedProjects.insert(updated.id)
         // Chats pick up new folders and instructions on their next message.
-        for controller in controllers.values where controller.session.projectID == updated.id {
+        // A chat still sitting in the old working folder (or the empty
+        // scratch folder used before any folder was linked) moves to the
+        // project's current working folder.
+        let previousFolder = previous.map { workspace(for: $0).standardizedFileURL.path }
+        let newFolder = workspace(for: updated)
+        for id in allSummaries.filter({ $0.projectID == updated.id }).map(\.id) {
+            guard let controller = controller(for: id) else { continue }
+            let current = controller.session.workspacePath.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+            if current == nil || current == previousFolder || controller.session.messages.isEmpty {
+                controller.moveWorkspace(to: newFolder)
+            }
             controller.invalidateAgent()
+        }
+        for controller in controllers.values where controller.session.projectID == updated.id && controller.session.messages.isEmpty {
+            controller.moveWorkspace(to: newFolder)
         }
         if isNew { newSession(project: updated) }
     }

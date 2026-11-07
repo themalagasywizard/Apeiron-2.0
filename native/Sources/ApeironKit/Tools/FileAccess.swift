@@ -49,6 +49,19 @@ public enum FileAccess {
         return "macOS blocked access to \(url.path) (privacy protection for Desktop, Documents, Downloads and external drives). Allow Apeiron in System Settings → Privacy & Security → Files and Folders (or Full Disk Access), then try again."
     }
 
+    /// macOS can show a privacy-protected or cloud-synced folder as empty
+    /// instead of refusing outright. Returns advice when that's likely.
+    public static func emptyListingHint(for url: URL) -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let protected = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents", "Library/CloudStorage"]
+            .map { home + "/" + $0 }
+        guard protected.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) || path.hasPrefix("/Volumes/") else {
+            return nil
+        }
+        return "  Note: this folder is protected by macOS privacy settings or synced from the cloud, so an empty listing may mean access is blocked. " + permissionAdvice(for: url)
+    }
+
     /// Checks a workspace is readable. Returns advice when it isn't.
     /// Reading it is also what makes macOS show its permission prompt.
     public static func checkReadable(_ url: URL) -> String? {

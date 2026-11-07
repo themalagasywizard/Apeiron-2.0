@@ -217,6 +217,17 @@ final class SessionController: Identifiable {
         Task { self.projectContext = await ProjectContext.load(workspace: url, includeGit: false) }
     }
 
+    /// Points the chat at a new working folder, even after it has history
+    /// (used when a project's folders change). Takes effect next message.
+    func moveWorkspace(to url: URL) {
+        guard session.workspacePath.map({ URL(fileURLWithPath: $0).standardizedFileURL.path }) != url.standardizedFileURL.path else { return }
+        session.workspacePath = url.path
+        projectContext = nil
+        if !isRunning { agent = nil }
+        checkWorkspaceAccess(url)
+        persist()
+    }
+
     /// Moves an untouched chat into a project (or out of one).
     func assign(to project: Project?) {
         guard session.messages.isEmpty, !isRunning else { return }
